@@ -17,8 +17,9 @@ fi
 
 # Check if database exists
 if [ ! -f "cnd_patents.db" ]; then
-    echo "❌ Database file not found: cnd_patents.db"
-    exit 1
+    echo "📄 Database file not found: cnd_patents.db"
+    echo "🔨 Creating database schema automatically..."
+    echo "   (Flask app will initialize the database on startup)"
 fi
 
 # Activate virtual environment and start Flask app
