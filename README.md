@@ -38,8 +38,8 @@ A comprehensive tool for downloading, storing, and analyzing Canadian patent dat
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd ckan
+git clone https://github.com/SamuelTagliabracci/AI-CanadianPatentAnalyzer.git
+cd AI-CanadianPatentAnalyzer
 ```
 
 2. Create and activate virtual environment:
