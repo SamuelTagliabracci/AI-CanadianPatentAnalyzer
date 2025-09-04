@@ -8,6 +8,8 @@ import sqlite3
 import math
 import threading
 import time
+import os
+import logging
 from datetime import datetime
 from pull_patents import CanadianPatentFetcher
 
@@ -15,6 +17,219 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'patent-browser-secret-key-2024'
 
 DATABASE = 'cnd_patents.db'
+
+def create_database_schema(db_path=DATABASE):
+    """Create comprehensive database schema if database doesn't exist"""
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        logging.info("Creating comprehensive patent database schema...")
+        
+        # Main patents table (from PT_main)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS patents_main (
+                patent_number TEXT PRIMARY KEY,
+                filing_date TEXT,
+                grant_date TEXT,
+                application_status_code TEXT,
+                application_type_code TEXT,
+                title_english TEXT,
+                title_french TEXT,
+                bibliographic_extract_date TEXT,
+                country_publication_code TEXT,
+                document_kind_type TEXT,
+                examination_request_date TEXT,
+                filing_country_code TEXT,
+                language_filing_code TEXT,
+                license_sale_indicator INTEGER,
+                pct_application_number TEXT,
+                pct_publication_number TEXT,
+                pct_publication_date TEXT,
+                parent_application_number TEXT,
+                pct_article_22_39_date TEXT,
+                pct_section_371_date TEXT,
+                pct_publication_country_code TEXT,
+                publication_kind_type TEXT,
+                printed_amended_country_code TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Patent abstracts table (from PT_abstract)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS patent_abstracts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patent_number TEXT NOT NULL,
+                sequence_number INTEGER,
+                filing_language_code TEXT,
+                abstract_language_code TEXT,
+                abstract_text TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patent_number) REFERENCES patents_main (patent_number)
+            )
+        ''')
+        
+        # Patent claims table (from PT_claim)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS patent_claims (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patent_number TEXT NOT NULL,
+                sequence_number INTEGER,
+                filing_language_code TEXT,
+                claims_text TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patent_number) REFERENCES patents_main (patent_number)
+            )
+        ''')
+        
+        # Patent disclosure table (from PT_disclosure)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS patent_disclosures (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patent_number TEXT NOT NULL,
+                sequence_number INTEGER,
+                filing_language_code TEXT,
+                disclosure_text TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patent_number) REFERENCES patents_main (patent_number)
+            )
+        ''')
+        
+        # Interested parties table (from PT_interested_party)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS patent_interested_parties (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patent_number TEXT NOT NULL,
+                agent_type_code TEXT,
+                applicant_type_code TEXT,
+                interested_party_type_code TEXT,
+                interested_party_type TEXT,
+                owner_enable_date TEXT,
+                ownership_end_date TEXT,
+                party_name TEXT,
+                party_address_line1 TEXT,
+                party_address_line2 TEXT,
+                party_address_line3 TEXT,
+                party_address_line4 TEXT,
+                party_address_line5 TEXT,
+                party_city TEXT,
+                party_province_code TEXT,
+                party_province TEXT,
+                party_postal_code TEXT,
+                party_country_code TEXT,
+                party_country TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patent_number) REFERENCES patents_main (patent_number)
+            )
+        ''')
+        
+        # IPC Classification table (from PT_IPC_classification)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS patent_ipc_classifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patent_number TEXT NOT NULL,
+                sequence_number INTEGER,
+                ipc_version_date TEXT,
+                classification_level TEXT,
+                classification_status_code TEXT,
+                classification_status TEXT,
+                ipc_section_code TEXT,
+                ipc_section TEXT,
+                ipc_class_code TEXT,
+                ipc_class TEXT,
+                ipc_subclass_code TEXT,
+                ipc_subclass TEXT,
+                ipc_main_group_code TEXT,
+                ipc_group TEXT,
+                ipc_subgroup_code TEXT,
+                ipc_subgroup TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patent_number) REFERENCES patents_main (patent_number)
+            )
+        ''')
+        
+        # Priority claims table (from PT_priority_claim)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS patent_priority_claims (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patent_number TEXT NOT NULL,
+                foreign_application_number TEXT,
+                priority_claim_kind_code TEXT,
+                priority_claim_country_code TEXT,
+                priority_claim_country TEXT,
+                priority_claim_date TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patent_number) REFERENCES patents_main (patent_number)
+            )
+        ''')
+        
+        # Additional tables for the patent fetcher functionality
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS datasets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT UNIQUE NOT NULL,
+                file_size INTEGER,
+                last_modified TEXT,
+                processed BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS file_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT UNIQUE NOT NULL,
+                file_path TEXT,
+                file_size INTEGER,
+                downloaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create indexes for better performance
+        logging.info("Creating database indexes...")
+        
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_patents_main_filing_date ON patents_main (filing_date)",
+            "CREATE INDEX IF NOT EXISTS idx_patents_main_status ON patents_main (application_status_code)",
+            "CREATE INDEX IF NOT EXISTS idx_patents_main_type ON patents_main (application_type_code)",
+            "CREATE INDEX IF NOT EXISTS idx_abstracts_patent_number ON patent_abstracts (patent_number)",
+            "CREATE INDEX IF NOT EXISTS idx_claims_patent_number ON patent_claims (patent_number)",
+            "CREATE INDEX IF NOT EXISTS idx_disclosures_patent_number ON patent_disclosures (patent_number)",
+            "CREATE INDEX IF NOT EXISTS idx_parties_patent_number ON patent_interested_parties (patent_number)",
+            "CREATE INDEX IF NOT EXISTS idx_parties_type ON patent_interested_parties (interested_party_type)",
+            "CREATE INDEX IF NOT EXISTS idx_parties_name ON patent_interested_parties (party_name)",
+            "CREATE INDEX IF NOT EXISTS idx_ipc_patent_number ON patent_ipc_classifications (patent_number)",
+            "CREATE INDEX IF NOT EXISTS idx_ipc_section ON patent_ipc_classifications (ipc_section_code)",
+            "CREATE INDEX IF NOT EXISTS idx_ipc_class ON patent_ipc_classifications (ipc_class_code)",
+            "CREATE INDEX IF NOT EXISTS idx_priority_patent_number ON patent_priority_claims (patent_number)",
+            "CREATE INDEX IF NOT EXISTS idx_priority_country ON patent_priority_claims (priority_claim_country_code)"
+        ]
+        
+        for index_sql in indexes:
+            cursor.execute(index_sql)
+        
+        conn.commit()
+        conn.close()
+        
+        logging.info("✅ Comprehensive patent database schema created successfully!")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Error creating database schema: {e}")
+        return False
+
+def initialize_database():
+    """Initialize database on application startup"""
+    if not os.path.exists(DATABASE):
+        logging.info(f"Database {DATABASE} not found. Creating new database...")
+        if create_database_schema():
+            logging.info("Database created successfully. You can now download patent data using the /download page.")
+        else:
+            logging.error("Failed to create database!")
+    else:
+        logging.info(f"Database {DATABASE} found.")
 
 # Global variables for download status tracking
 download_status = {
@@ -28,6 +243,11 @@ download_status = {
 
 def get_db_connection():
     """Get database connection"""
+    # Check if database exists, create if it doesn't
+    if not os.path.exists(DATABASE):
+        logging.warning(f"Database {DATABASE} not found during connection attempt. Creating...")
+        create_database_schema()
+    
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row  # This enables column access by name
     return conn
@@ -545,4 +765,10 @@ def get_patent_disclosure(patent_number):
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
+    # Configure logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    
+    # Initialize database on startup
+    initialize_database()
+    
     app.run(debug=True, host='0.0.0.0', port=5000)
