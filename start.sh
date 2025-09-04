@@ -11,7 +11,7 @@ if [ ! -d "venv" ]; then
     echo "❌ Virtual environment not found. Please create one first:"
     echo "   python3 -m venv venv"
     echo "   source venv/bin/activate"
-    echo "   pip install flask"
+    echo "   pip install -r requirements.txt"
     exit 1
 fi
 
