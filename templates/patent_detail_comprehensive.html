@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block title %}Patent {{ patent_number }} - Canadian Patents{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 id="patentTitle">Patent {{ patent_number }}</h2>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Search
+            </a>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading patent details...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="alert alert-danger" style="display: none;">
+            <h4>Error Loading Patent</h4>
+            <p id="errorMessage"></p>
+        </div>
+
+        <!-- Patent Content -->
+        <div id="patentContent" style="display: none;">
+            
+            <!-- Main Patent Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-file-alt"></i> Patent Information</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 id="englishTitle" class="text-primary"></h5>
+                            <h6 id="frenchTitle" class="text-muted mb-3"></h6>
+                            
+                            <p><strong>Patent Number:</strong> <span id="patentNumber"></span></p>
+                            <p><strong>Status:</strong> <span id="patentStatus" class="badge"></span></p>
+                            <p><strong>Filing Date:</strong> <span id="filingDate"></span></p>
+                            <p><strong>Grant Date:</strong> <span id="grantDate"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Application Type:</strong> <span id="applicationType"></span></p>
+                            <p><strong>Filing Country:</strong> <span id="filingCountry"></span></p>
+                            <p><strong>Language:</strong> <span id="filingLanguage"></span></p>
+                            <p><strong>Publication:</strong> <span id="publicationInfo"></span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Abstracts -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-file-text"></i> Abstract</h4>
+                </div>
+                <div class="card-body" id="abstractsContainer">
+                    <!-- Abstracts will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Interested Parties -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-users"></i> Interested Parties</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Inventors</h6>
+                            <ul id="inventorsList" class="list-unstyled"></ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Assignees/Owners</h6>
+                            <ul id="assigneesList" class="list-unstyled"></ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Full party details (collapsible) -->
+                    <div class="mt-3">
+                        <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#fullPartiesDetails">
+                            <i class="fas fa-address-card"></i> Show Full Contact Details
+                        </button>
+                        <div class="collapse mt-3" id="fullPartiesDetails">
+                            <div id="fullPartiesContainer"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Classifications -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-tags"></i> International Patent Classifications (IPC)</h4>
+                </div>
+                <div class="card-body" id="classificationsContainer">
+                    <!-- Classifications will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Priority Claims -->
+            <div class="card mb-4" id="priorityClaimsCard" style="display: none;">
+                <div class="card-header">
+                    <h4><i class="fas fa-globe"></i> Priority Claims</h4>
+                </div>
+                <div class="card-body" id="priorityClaimsContainer">
+                    <!-- Priority claims will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Claims (On-Demand) -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4><i class="fas fa-list-ol"></i> Patent Claims</h4>
+                    <span class="badge bg-secondary" id="claimsCount">0 claims</span>
+                </div>
+                <div class="card-body">
+                    <button class="btn btn-primary" id="loadClaimsBtn" onclick="loadClaims()">
+                        <i class="fas fa-download"></i> Load Claims
+                    </button>
+                    <div id="claimsContainer" style="display: none;">
+                        <div class="mt-3" id="claimsContent"></div>
+                    </div>
+                    <div id="claimsLoading" class="text-center mt-3" style="display: none;">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        Loading claims...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Disclosure Details (On-Demand) -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4><i class="fas fa-file-contract"></i> Patent Disclosure</h4>
+                    <span class="badge bg-secondary" id="disclosureCount">0 disclosure sections</span>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Patent disclosure contains the full technical description and specifications. 
+                        This can be quite lengthy and detailed.
+                    </div>
+                    <button class="btn btn-primary" id="loadDisclosureBtn" onclick="loadDisclosure()">
+                        <i class="fas fa-eye"></i> View Full Disclosure
+                    </button>
+                    <div id="disclosureContainer" style="display: none;">
+                        <div class="mt-3" id="disclosureContent"></div>
+                    </div>
+                    <div id="disclosureLoading" class="text-center mt-3" style="display: none;">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        Loading disclosure...
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+let patentData = null;
+
+// Load patent details when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadPatentDetails();
+});
+
+function loadPatentDetails() {
+    const patentNumber = '{{ patent_number }}';
+    
+    fetch(`/api/patent/${patentNumber}/details`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            
+            patentData = data;
+            displayPatentDetails(data);
+            
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('patentContent').style.display = 'block';
+        })
+        .catch(error => {
+            showError('Failed to load patent details: ' + error.message);
+        });
+}
+
+function showError(message) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errorState').style.display = 'block';
+    document.getElementById('errorMessage').textContent = message;
+}
+
+function displayPatentDetails(data) {
+    const patent = data.patent;
+    
+    // Basic patent information
+    document.getElementById('patentNumber').textContent = patent.patent_number;
+    document.getElementById('englishTitle').textContent = patent.title_english || 'No English title';
+    document.getElementById('frenchTitle').textContent = patent.title_french || '';
+    
+    // Status with color coding
+    const statusBadge = document.getElementById('patentStatus');
+    statusBadge.textContent = patent.application_status_code || 'Unknown';
+    statusBadge.className = 'badge ' + getStatusBadgeClass(patent.application_status_code);
+    
+    document.getElementById('filingDate').textContent = formatDate(patent.filing_date);
+    document.getElementById('grantDate').textContent = formatDate(patent.grant_date);
+    document.getElementById('applicationType').textContent = patent.application_type_code || 'N/A';
+    document.getElementById('filingCountry').textContent = patent.filing_country_code || 'N/A';
+    document.getElementById('filingLanguage').textContent = patent.language_filing_code || 'N/A';
+    document.getElementById('publicationInfo').textContent = patent.country_publication_code || 'N/A';
+    
+    // Abstracts
+    displayAbstracts(data.abstracts);
+    
+    // Interested parties
+    displayInterestedParties(data.parties);
+    
+    // Classifications
+    displayClassifications(data.classifications);
+    
+    // Priority claims
+    displayPriorityClaims(data.priority_claims);
+    
+    // Counts
+    document.getElementById('claimsCount').textContent = `${data.claims_count} claims`;
+    document.getElementById('disclosureCount').textContent = `${data.disclosure_count} disclosure sections`;
+}
+
+function displayAbstracts(abstracts) {
+    const container = document.getElementById('abstractsContainer');
+    if (abstracts.length === 0) {
+        container.innerHTML = '<p class="text-muted">No abstract available</p>';
+        return;
+    }
+    
+    let html = '';
+    abstracts.forEach(abstract => {
+        if (abstract.abstract_text) {
+            html += `
+                <div class="mb-3">
+                    <small class="text-muted">Language: ${abstract.abstract_language_code}</small>
+                    <p class="mt-1">${abstract.abstract_text}</p>
+                </div>
+            `;
+        }
+    });
+    
+    container.innerHTML = html || '<p class="text-muted">No abstract available</p>';
+}
+
+function displayInterestedParties(parties) {
+    const inventorsList = document.getElementById('inventorsList');
+    const assigneesList = document.getElementById('assigneesList');
+    const fullContainer = document.getElementById('fullPartiesContainer');
+    
+    const inventors = parties.filter(p => p.interested_party_type === 'Inventor');
+    const assignees = parties.filter(p => p.interested_party_type === 'Owner' || p.interested_party_type === 'Assignee');
+    
+    // Inventors
+    if (inventors.length > 0) {
+        inventorsList.innerHTML = inventors.map(inv => 
+            `<li><i class="fas fa-user"></i> ${inv.party_name}</li>`
+        ).join('');
+    } else {
+        inventorsList.innerHTML = '<li class="text-muted">No inventors listed</li>';
+    }
+    
+    // Assignees
+    if (assignees.length > 0) {
+        assigneesList.innerHTML = assignees.map(ass => 
+            `<li><i class="fas fa-building"></i> ${ass.party_name}</li>`
+        ).join('');
+    } else {
+        assigneesList.innerHTML = '<li class="text-muted">No assignees listed</li>';
+    }
+    
+    // Full details
+    let fullHtml = '';
+    parties.forEach(party => {
+        if (party.party_name) {
+            fullHtml += `
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <h6>${party.party_name} <span class="badge bg-secondary">${party.interested_party_type}</span></h6>
+                        ${party.party_address_line1 ? `<p class="mb-1">${party.party_address_line1}</p>` : ''}
+                        ${party.party_city ? `<p class="mb-1">${party.party_city}, ${party.party_province || ''} ${party.party_postal_code || ''}</p>` : ''}
+                        ${party.party_country ? `<p class="mb-0">${party.party_country}</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    fullContainer.innerHTML = fullHtml || '<p class="text-muted">No detailed contact information available</p>';
+}
+
+function displayClassifications(classifications) {
+    const container = document.getElementById('classificationsContainer');
+    
+    if (classifications.length === 0) {
+        container.innerHTML = '<p class="text-muted">No IPC classifications available</p>';
+        return;
+    }
+    
+    let html = '';
+    classifications.forEach(cls => {
+        if (cls.ipc_section) {
+            html += `
+                <div class="mb-3 p-3 border rounded">
+                    <h6>${cls.ipc_section_code}: ${cls.ipc_section}</h6>
+                    ${cls.ipc_class ? `<p><strong>Class:</strong> ${cls.ipc_class_code} - ${cls.ipc_class}</p>` : ''}
+                    ${cls.ipc_subclass ? `<p><strong>Subclass:</strong> ${cls.ipc_subclass_code} - ${cls.ipc_subclass}</p>` : ''}
+                    ${cls.ipc_group ? `<p class="mb-0"><strong>Group:</strong> ${cls.ipc_group}</p>` : ''}
+                </div>
+            `;
+        }
+    });
+    
+    container.innerHTML = html;
+}
+
+function displayPriorityClaims(priorityClaims) {
+    const card = document.getElementById('priorityClaimsCard');
+    const container = document.getElementById('priorityClaimsContainer');
+    
+    if (priorityClaims.length === 0) {
+        card.style.display = 'none';
+        return;
+    }
+    
+    card.style.display = 'block';
+    let html = '';
+    
+    priorityClaims.forEach(claim => {
+        html += `
+            <div class="mb-2 p-2 border rounded">
+                <strong>${claim.priority_claim_country}:</strong> 
+                ${claim.foreign_application_number} 
+                <small class="text-muted">(${formatDate(claim.priority_claim_date)})</small>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function loadClaims() {
+    const patentNumber = '{{ patent_number }}';
+    const btn = document.getElementById('loadClaimsBtn');
+    const container = document.getElementById('claimsContainer');
+    const loading = document.getElementById('claimsLoading');
+    const content = document.getElementById('claimsContent');
+    
+    btn.style.display = 'none';
+    loading.style.display = 'block';
+    
+    fetch(`/api/patent/${patentNumber}/claims`)
+        .then(response => response.json())
+        .then(claims => {
+            loading.style.display = 'none';
+            container.style.display = 'block';
+            
+            if (claims.length === 0) {
+                content.innerHTML = '<p class="text-muted">No claims available</p>';
+                return;
+            }
+            
+            let html = '';
+            claims.forEach(claim => {
+                if (claim.claims_text) {
+                    html += `
+                        <div class="mb-3 p-3 border rounded">
+                            <h6>Claim ${claim.sequence_number}</h6>
+                            <p class="mb-0">${claim.claims_text}</p>
+                        </div>
+                    `;
+                }
+            });
+            
+            content.innerHTML = html;
+        })
+        .catch(error => {
+            loading.style.display = 'none';
+            content.innerHTML = '<div class="alert alert-danger">Error loading claims: ' + error.message + '</div>';
+            container.style.display = 'block';
+        });
+}
+
+function loadDisclosure() {
+    const patentNumber = '{{ patent_number }}';
+    const btn = document.getElementById('loadDisclosureBtn');
+    const container = document.getElementById('disclosureContainer');
+    const loading = document.getElementById('disclosureLoading');
+    const content = document.getElementById('disclosureContent');
+    
+    btn.style.display = 'none';
+    loading.style.display = 'block';
+    
+    fetch(`/api/patent/${patentNumber}/disclosure`)
+        .then(response => response.json())
+        .then(disclosures => {
+            loading.style.display = 'none';
+            container.style.display = 'block';
+            
+            if (disclosures.length === 0) {
+                content.innerHTML = '<p class="text-muted">No disclosure available</p>';
+                return;
+            }
+            
+            let html = '';
+            disclosures.forEach(disclosure => {
+                if (disclosure.disclosure_text) {
+                    html += `
+                        <div class="mb-4">
+                            <h6>Section ${disclosure.sequence_number}</h6>
+                            <div class="p-3 bg-light rounded" style="white-space: pre-wrap; max-height: 500px; overflow-y: auto;">
+${disclosure.disclosure_text}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            content.innerHTML = html;
+        })
+        .catch(error => {
+            loading.style.display = 'none';
+            content.innerHTML = '<div class="alert alert-danger">Error loading disclosure: ' + error.message + '</div>';
+            container.style.display = 'block';
+        });
+}
+
+function getStatusBadgeClass(status) {
+    switch (status) {
+        case 'GR': return 'bg-success';
+        case 'EX': return 'bg-warning text-dark';
+        case 'DE': case 'LA': return 'bg-secondary';
+        default: return 'bg-primary';
+    }
+}
+
+function formatDate(dateString) {
+    if (!dateString || dateString === 'NULL') return 'N/A';
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
+    } catch {
+        return dateString;
+    }
+}
+</script>
+
+{% endblock %}

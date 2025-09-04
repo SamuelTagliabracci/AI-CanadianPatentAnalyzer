@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Patent #{{ patent.patent_number }} - Canadian Patents{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <!-- Patent Details Card -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-file-text me-2"></i>
+                    Patent #{{ patent.patent_number }}
+                </h4>
+                <div>
+                    {% if patent.status == 'EX' %}
+                        <span class="badge bg-success fs-6">{{ patent.status }} - Expired (Free to use!)</span>
+                    {% elif patent.status == 'DE' %}
+                        <span class="badge bg-warning fs-6">{{ patent.status }} - Dead/Abandoned</span>
+                    {% elif patent.status == 'LA' %}
+                        <span class="badge bg-info fs-6">{{ patent.status }} - Lapsed</span>
+                    {% elif patent.status == 'GR' %}
+                        <span class="badge bg-danger fs-6">{{ patent.status }} - Active/Protected</span>
+                    {% else %}
+                        <span class="badge bg-secondary fs-6">{{ patent.status or 'Unknown' }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Title -->
+                <h5 class="text-primary mb-3">
+                    {% if patent.title %}
+                        {{ patent.title }}
+                    {% else %}
+                        <em class="text-muted">No title available</em>
+                    {% endif %}
+                </h5>
+
+                <!-- Key Information -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="info-item">
+                            <strong><i class="fas fa-calendar-alt me-2"></i>Filing Date:</strong>
+                            <span class="ms-2">{{ patent.filing_date or 'Not specified' }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item">
+                            <strong><i class="fas fa-award me-2"></i>Grant Date:</strong>
+                            <span class="ms-2">{{ patent.grant_date or 'Not granted' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="info-item">
+                            <strong><i class="fas fa-user-tie me-2"></i>Inventor:</strong>
+                            <span class="ms-2">{{ patent.inventor_name or 'Not specified' }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item">
+                            <strong><i class="fas fa-building me-2"></i>Assignee:</strong>
+                            <span class="ms-2">{{ patent.assignee if patent.assignee and patent.assignee != 'N/A' else 'Individual inventor' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {% if patent.classification %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="info-item">
+                            <strong><i class="fas fa-tags me-2"></i>Classification:</strong>
+                            <span class="ms-2">{{ patent.classification }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Categories -->
+                {% if patent.categories %}
+                <div class="mb-4">
+                    <strong><i class="fas fa-folder me-2"></i>Categories:</strong>
+                    <div class="mt-2">
+                        {% for category in patent.categories.split(', ') %}
+                        <span class="badge bg-primary me-2 mb-1">{{ category }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Description -->
+                {% if patent.description and patent.description != 'N/A' %}
+                <div class="mb-4">
+                    <strong><i class="fas fa-align-left me-2"></i>Description:</strong>
+                    <div class="mt-2 p-3 bg-light rounded">
+                        {{ patent.description }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Innovation Opportunities (for expired patents) -->
+                {% if patent.status == 'EX' %}
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-lightbulb me-2"></i>Innovation Opportunity!</h6>
+                    <p class="mb-2">This patent has <strong>expired</strong>, meaning you can freely use, modify, and improve upon this invention!</p>
+                    <p class="mb-0"><strong>Ideas for modernization:</strong></p>
+                    <ul class="mb-0 mt-2">
+                        {% if 'machine' in patent.title.lower() %}
+                        <li>Add IoT sensors for real-time monitoring</li>
+                        <li>Integrate AI for predictive maintenance</li>
+                        <li>Implement automated controls</li>
+                        {% elif 'apparatus' in patent.title.lower() or 'device' in patent.title.lower() %}
+                        <li>Make it smart with wireless connectivity</li>
+                        <li>Add mobile app integration</li>
+                        <li>Improve with modern materials</li>
+                        {% else %}
+                        <li>Modernize with current technology</li>
+                        <li>Improve efficiency and automation</li>
+                        <li>Add digital controls and monitoring</li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% elif patent.status == 'DE' %}
+                <div class="alert alert-warning">
+                    <h6><i class="fas fa-exclamation-triangle me-2"></i>Abandoned Patent</h6>
+                    <p class="mb-0">This patent was abandoned, which might indicate the concept was ahead of its time or faced technical challenges. Consider if modern technology could make this viable!</p>
+                </div>
+                {% endif %}
+
+                <!-- Back button -->
+                <div class="mt-4">
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Patent List
+                    </a>
+                    {% if patent.url %}
+                    <a href="{{ patent.url }}" target="_blank" class="btn btn-outline-primary">
+                        <i class="fas fa-external-link-alt me-2"></i>Official Patent Page
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Similar Patents -->
+        {% if similar_patents %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-search me-2"></i>Similar Patents</h5>
+            </div>
+            <div class="card-body">
+                {% for similar in similar_patents %}
+                <div class="mb-3 pb-2 border-bottom">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>Patent #{{ similar.patent_number }}</strong>
+                            {% if similar.status == 'EX' %}
+                                <span class="badge bg-success ms-2">{{ similar.status }}</span>
+                            {% elif similar.status == 'DE' %}
+                                <span class="badge bg-warning ms-2">{{ similar.status }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary ms-2">{{ similar.status }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="mt-1">
+                        <small>{{ similar.title[:60] }}{% if similar.title|length > 60 %}...{% endif %}</small>
+                    </div>
+                    <div class="mt-2">
+                        <a href="{{ url_for('patent_detail', patent_number=similar.patent_number) }}" class="btn btn-outline-primary btn-sm">
+                            View Details
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-tools me-2"></i>Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if patent.status == 'EX' %}
+                    <a href="{{ url_for('index', status='EX', category=patent.categories.split(', ')[0] if patent.categories else 'all') }}" 
+                       class="btn btn-success btn-sm">
+                        <i class="fas fa-lightbulb me-2"></i>Find More Expired Patents
+                    </a>
+                    {% endif %}
+                    
+                    {% if patent.categories %}
+                    <a href="{{ url_for('index', category=patent.categories.split(', ')[0]) }}" 
+                       class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-folder me-2"></i>Browse Category
+                    </a>
+                    {% endif %}
+                    
+                    {% if patent.assignee and patent.assignee != 'N/A' %}
+                    <a href="{{ url_for('index', search=patent.assignee) }}" 
+                       class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-building me-2"></i>More by {{ patent.assignee[:20] }}{% if patent.assignee|length > 20 %}...{% endif %}
+                    </a>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('analytics') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-chart-bar me-2"></i>View Analytics
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Add some interactivity if needed
+document.addEventListener('DOMContentLoaded', function() {
+    // Highlight patent number for easy copying
+    const patentNumber = document.querySelector('h4 span, h4 strong');
+    if (patentNumber) {
+        patentNumber.addEventListener('click', function() {
+            navigator.clipboard.writeText(this.textContent);
+            // Show brief feedback
+            const originalText = this.textContent;
+            this.textContent = 'Copied!';
+            setTimeout(() => {
+                this.textContent = originalText;
+            }, 1000);
+        });
+        patentNumber.style.cursor = 'pointer';
+        patentNumber.title = 'Click to copy patent number';
+    }
+});
+</script>
+{% endblock %}

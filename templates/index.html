@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}Patent Browser - Canadian Patents{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar with filters -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-filter me-2"></i>Search & Filters</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" id="searchForm">
+                    <!-- Search Term -->
+                    <div class="mb-3">
+                        <label for="search" class="form-label">Search Terms</label>
+                        <input type="text" class="form-control" id="search" name="search" 
+                               value="{{ search_term }}" placeholder="Title, description, inventor...">
+                        <small class="text-muted">Search in titles, descriptions, inventors, and assignees</small>
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Patent Status</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+                            {% for status in statuses %}
+                            <option value="{{ status.status }}" {% if status_filter == status.status %}selected{% endif %}>
+                                {{ status.status }}
+                                {% if status.status == 'EX' %}(Expired - Free to use!){% endif %}
+                                {% if status.status == 'DE' %}(Dead/Abandoned){% endif %}
+                                {% if status.status == 'LA' %}(Lapsed){% endif %}
+                                {% if status.status == 'GR' %}(Granted - Protected){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Category Filter -->
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Technology Category</label>
+                        <select class="form-select" id="category" name="category">
+                            <option value="all" {% if category_filter == 'all' %}selected{% endif %}>All Categories</option>
+                            {% for category in categories %}
+                            <option value="{{ category.category_name }}" {% if category_filter == category.category_name %}selected{% endif %}>
+                                {{ category.category_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Sort Options -->
+                    <div class="row">
+                        <div class="col-8">
+                            <label for="sort" class="form-label">Sort By</label>
+                            <select class="form-select" id="sort" name="sort">
+                                <option value="patent_number" {% if sort_by == 'patent_number' %}selected{% endif %}>Patent Number</option>
+                                <option value="title" {% if sort_by == 'title' %}selected{% endif %}>Title</option>
+                                <option value="filing_date" {% if sort_by == 'filing_date' %}selected{% endif %}>Filing Date</option>
+                                <option value="status" {% if sort_by == 'status' %}selected{% endif %}>Status</option>
+                                <option value="assignee" {% if sort_by == 'assignee' %}selected{% endif %}>Assignee</option>
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <label for="order" class="form-label">Order</label>
+                            <select class="form-select" id="order" name="order">
+                                <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>↑ Asc</option>
+                                <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>↓ Desc</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="page" value="1">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+
+                    <div class="mt-3 d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search me-2"></i>Search Patents
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Showing {{ (page-1)*per_page + 1 }} - {{ page*per_page if page*per_page < total else total }} 
+                        of {{ total }} patents
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content area -->
+    <div class="col-md-9">
+        <!-- Results header -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3>
+                <i class="fas fa-list-alt me-2"></i>
+                Canadian Patents
+                {% if search_term %}
+                    <small class="text-muted">- Search: "{{ search_term }}"</small>
+                {% endif %}
+            </h3>
+            
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('index', per_page=25, search=search_term, status=status_filter, category=category_filter, sort=sort_by, order=sort_order) }}" 
+                   class="btn btn-outline-secondary btn-sm {% if per_page == 25 %}active{% endif %}">25</a>
+                <a href="{{ url_for('index', per_page=50, search=search_term, status=status_filter, category=category_filter, sort=sort_by, order=sort_order) }}" 
+                   class="btn btn-outline-secondary btn-sm {% if per_page == 50 %}active{% endif %}">50</a>
+                <a href="{{ url_for('index', per_page=100, search=search_term, status=status_filter, category=category_filter, sort=sort_by, order=sort_order) }}" 
+                   class="btn btn-outline-secondary btn-sm {% if per_page == 100 %}active{% endif %}">100</a>
+            </div>
+        </div>
+
+        <!-- Patents table -->
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Patent #</th>
+                            <th>Title</th>
+                            <th>Status</th>
+                            <th>Filing Date</th>
+                            <th>Assignee</th>
+                            <th>Categories</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for patent in patents %}
+                        <tr>
+                            <td>
+                                <strong>{{ patent.patent_number }}</strong>
+                            </td>
+                            <td>
+                                <div class="patent-title">
+                                    {% if patent.title %}
+                                        {{ patent.title[:80] }}{% if patent.title|length > 80 %}...{% endif %}
+                                    {% else %}
+                                        <em class="text-muted">No title available</em>
+                                    {% endif %}
+                                </div>
+                                {% if patent.description and patent.description != 'N/A' %}
+                                <small class="text-muted">
+                                    {{ patent.description[:100] }}{% if patent.description|length > 100 %}...{% endif %}
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if patent.status == 'EX' %}
+                                    <span class="badge bg-success">{{ patent.status }}</span>
+                                    <small class="text-success d-block">Expired - Free!</small>
+                                {% elif patent.status == 'DE' %}
+                                    <span class="badge bg-warning">{{ patent.status }}</span>
+                                    <small class="text-warning d-block">Dead/Abandoned</small>
+                                {% elif patent.status == 'LA' %}
+                                    <span class="badge bg-info">{{ patent.status }}</span>
+                                    <small class="text-info d-block">Lapsed</small>
+                                {% elif patent.status == 'GR' %}
+                                    <span class="badge bg-danger">{{ patent.status }}</span>
+                                    <small class="text-danger d-block">Active</small>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ patent.status or 'Unknown' }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small>{{ patent.filing_date or 'Not specified' }}</small>
+                            </td>
+                            <td>
+                                <small>{{ patent.assignee[:30] if patent.assignee and patent.assignee != 'N/A' else 'Individual' }}{% if patent.assignee and patent.assignee|length > 30 %}...{% endif %}</small>
+                                {% if patent.inventor_name and patent.inventor_name != 'N/A' %}
+                                <br><small class="text-muted">Inv: {{ patent.inventor_name[:20] }}{% if patent.inventor_name|length > 20 %}...{% endif %}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if patent.categories %}
+                                    {% for category in patent.categories.split(', ')[:2] %}
+                                    <span class="badge bg-light text-dark mb-1">{{ category }}</span>
+                                    {% endfor %}
+                                    {% if patent.categories.split(', ')|length > 2 %}
+                                    <small class="text-muted">+{{ patent.categories.split(', ')|length - 2 }} more</small>
+                                    {% endif %}
+                                {% else %}
+                                    <small class="text-muted">Uncategorized</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('patent_detail', patent_number=patent.patent_number) }}" 
+                                   class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="d-flex justify-content-center mt-4">
+            <nav aria-label="Patents pagination">
+                <ul class="pagination">
+                    <!-- Previous button -->
+                    {% if page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('index', page=page-1, per_page=per_page, search=search_term, status=status_filter, category=category_filter, sort=sort_by, order=sort_order) }}">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <!-- Page numbers -->
+                    {% set start_page = [1, page-2]|max %}
+                    {% set end_page = [total_pages, page+2]|min %}
+                    
+                    {% if start_page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('index', page=1, per_page=per_page, search=search_term, status=status_filter, category=category_filter, sort=sort_by, order=sort_order) }}">1</a>
+                    </li>
+                    {% if start_page > 2 %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                    {% endif %}
+
+                    {% for p in range(start_page, end_page + 1) %}
+                    <li class="page-item {% if p == page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('index', page=p, per_page=per_page, search=search_term, status=status_filter, category=category_filter, sort=sort_by, order=sort_order) }}">{{ p }}</a>
+                    </li>
+                    {% endfor %}
+
+                    {% if end_page < total_pages %}
+                    {% if end_page < total_pages - 1 %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('index', page=total_pages, per_page=per_page, search=search_term, status=status_filter, category=category_filter, sort=sort_by, order=sort_order) }}">{{ total_pages }}</a>
+                    </li>
+                    {% endif %}
+
+                    <!-- Next button -->
+                    {% if page < total_pages %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('index', page=page+1, per_page=per_page, search=search_term, status=status_filter, category=category_filter, sort=sort_by, order=sort_order) }}">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-submit form when filters change
+document.querySelectorAll('#searchForm select').forEach(function(select) {
+    select.addEventListener('change', function() {
+        // Reset to page 1 when filters change
+        document.querySelector('input[name="page"]').value = 1;
+        document.getElementById('searchForm').submit();
+    });
+});
+
+// Submit on Enter in search box
+document.getElementById('search').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        document.querySelector('input[name="page"]').value = 1;
+        document.getElementById('searchForm').submit();
+    }
+});
+</script>
+{% endblock %}
